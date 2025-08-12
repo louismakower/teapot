@@ -5,6 +5,10 @@ from fastapi import FastAPI
 from datetime import datetime, UTC
 from pathlib import Path
 from dotenv import load_dotenv
+import threading
+
+lock = threading.Lock()
+
 
 load_dotenv()
 app = FastAPI(title="Tea counter")
@@ -49,29 +53,30 @@ def count_lines_in_file(filepath: Path) -> int:
 def git_commit_and_push(username: str, drink_type: str):
     """Commit changes and push to GitHub"""
     try:
-        # Add all changes in data directory
-        result = subprocess.run(["git", "add", f"data/{username}/"], cwd=Path.cwd(), capture_output=True, text=True)
-        if result.returncode != 0:
-            logger.error(f"Failed to add files for {username}'s {drink_type}: {result.stderr}")
-            return False
-        
-        # Create commit message
-        commit_message = f"{username} registered {drink_type} at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
-        
-        # Commit changes
-        result = subprocess.run(["git", "commit", "-m", commit_message], cwd=Path.cwd(), capture_output=True, text=True)
-        if result.returncode != 0:
-            logger.error(f"Failed to commit {username}'s {drink_type}: {result.stderr}")
-            return False
-        
-        # Push to GitHub
-        result = subprocess.run(["git", "push", "origin", "main"], cwd=Path.cwd(), capture_output=True, text=True)
-        if result.returncode != 0:
-            logger.error(f"Failed to push {username}'s {drink_type}: {result.stderr}")
-            return False
+        with lock:
+            # Add all changes in data directory
+            result = subprocess.run(["git", "add", f"data/{username}/"], cwd=Path.cwd(), capture_output=True, text=True)
+            if result.returncode != 0:
+                logger.error(f"Failed to add files for {username}'s {drink_type}: {result.stderr}")
+                return False
             
-        logger.info(f"Successfully pushed {username}'s {drink_type} to GitHub")
-        return True
+            # Create commit message
+            commit_message = f"{username} registered {drink_type} at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+            
+            # Commit changes
+            result = subprocess.run(["git", "commit", "-m", commit_message], cwd=Path.cwd(), capture_output=True, text=True)
+            if result.returncode != 0:
+                logger.error(f"Failed to commit {username}'s {drink_type}: {result.stderr}")
+                return False
+            
+            # Push to GitHub
+            result = subprocess.run(["git", "push", "origin", "main"], cwd=Path.cwd(), capture_output=True, text=True)
+            if result.returncode != 0:
+                logger.error(f"Failed to push {username}'s {drink_type}: {result.stderr}")
+                return False
+                
+            logger.info(f"Successfully pushed {username}'s {drink_type} to GitHub")
+            return True
         
     except Exception as e:
         logger.error(f"Unexpected error in git operations: {str(e)}")
