@@ -2,7 +2,7 @@ Hardware: [WIZnet W5500-EVB-Pico](https://thepihut.com/products/wiznet-w5100s-ev
 
 ## Hardware steps
 1. Add the POE component.
->**Note:** the VC1 and VC2 labels are the wrong way round - ignore them.)
+>**Note:** the VC1 and VC2 labels are the wrong way round - ignore them.
 2. Connect the switch into **Ground** and **Port 27** on the Pico.
 
 ## Setup Steps
