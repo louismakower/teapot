@@ -1,6 +1,3 @@
-Follow this [guide](https://www.hackster.io/Shilleh/how-to-use-vscode-with-raspberry-pi-pico-w-and-micropython-de88d6
-) to use VSCode with the Pico.
-
 Hardware: [WIZnet W5500-EVB-Pico](https://thepihut.com/products/wiznet-w5100s-evb-pico-rp2040-board-with-ethernet?srsltid=AfmBOooQ7SRgiXSiHIm8nm7YFBl2_ydEktIVkSzv2TyWrW6W12kUSfSE) & [WIZnet WIZPoE](https://thepihut.com/products/wiznet-wizpoe-p1-poe-module).
 
 ## Hardware steps
@@ -21,7 +18,8 @@ Hardware: [WIZnet W5500-EVB-Pico](https://thepihut.com/products/wiznet-w5100s-ev
 
 
 ## Edit username, add IP address and upload:
-1. Install the raspbery pi pico extension in VSCode.
+1. Install the raspbery pi pico extension in VSCode.  Follow this [guide](https://www.hackster.io/Shilleh/how-to-use-vscode-with-raspberry-pi-pico-w-and-micropython-de88d6
+) if necessary.
 2. Copy the file `pico-script.py` to a workspace.
 2. Change the **username** to your own name.
 3. Add the **IP** and **port** being used for the server.
