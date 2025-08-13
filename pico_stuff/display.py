@@ -435,6 +435,15 @@ class ManualGC9A01:
         """Convert RGB values to 16-bit RGB565 format"""
         return ((r & 0xF8) << 8) | ((g & 0xFC) << 3) | (b >> 3)
     
+    def _write_buffer_to_window(self, x, y, width, height, buffer_data):
+        """Write a buffer to a specific window on the display"""
+        self.set_window(x, y, x + width - 1, y + height - 1)
+        
+        self.cs.off()
+        self.dc.on()
+        self.spi.write(buffer_data)
+        self.cs.on()
+    
     def set_window(self, x0, y0, x1, y1):
         """Set the pixel address window for drawing"""
         # Column address set
@@ -481,140 +490,229 @@ class ManualGC9A01:
         if y + height > self.height:
             height = self.height - y
         
-        self.set_window(x, y, x + width - 1, y + height - 1)
-        
         pixels_to_send = width * height
         color_high = color >> 8
         color_low = color & 0xFF
         
-        self.cs.off()
-        self.dc.on()
-        for i in range(pixels_to_send):
-            self.spi.write(bytearray([color_high, color_low]))
-        self.cs.on()
-    
-    def draw_pixel(self, x, y, color):
-        """Draw a single pixel"""
-        if x >= self.width or y >= self.height or x < 0 or y < 0:
-            return
+        # Create buffer for the rectangle
+        buffer = bytearray(pixels_to_send * 2)
+        for i in range(0, len(buffer), 2):
+            buffer[i] = color_high
+            buffer[i + 1] = color_low
         
-        self.set_window(x, y, x, y)
-        
-        self.cs.off()
-        self.dc.on()
-        self.spi.write(bytearray([color >> 8, color & 0xFF]))
-        self.cs.on()
-    
-    def draw_char(self, x, y, char, color, bg_color=None, scale=1):
-        """Draw a single character at position (x, y)"""
-        char = char.upper()
-        if char not in self.font_8x8:
-            char = '?'
-        
-        font_data = self.font_8x8[char]
-        
-        for row in range(8):
-            for col in range(8):
-                pixel_x = x + (col * scale)
-                pixel_y = y + (row * scale)
-                
-                if font_data[row] & (1 << (7 - col)):
-                    # Character pixel - draw in foreground color
-                    if scale == 1:
-                        self.draw_pixel(pixel_x, pixel_y, color)
-                    else:
-                        self.fill_rect(pixel_x, pixel_y, scale, scale, color)
-                elif bg_color is not None:
-                    # Background pixel - draw in background color
-                    if scale == 1:
-                        self.draw_pixel(pixel_x, pixel_y, bg_color)
-                    else:
-                        self.fill_rect(pixel_x, pixel_y, scale, scale, bg_color)
-    
+        # Send entire buffer at once
+        self._write_buffer_to_window(x, y, width, height, buffer)
+
     def draw_text(self, x, y, text, color, bg_color=None, scale=1):
-        """Draw text at position (x, y)"""
-        char_width = 8 * scale
-        char_height = 8 * scale
+        """Draw text at position (x, y) by buffering entire lines"""
+        char_width = round(8 * scale)
+        char_height = round(8 * scale)
         
-        current_x = x
+        lines = text.split('\n')
         current_y = y
         
-        for char in text:
-            if char == '\n':
-                current_x = x
-                current_y += char_height
-            else:
-                if current_x + char_width <= self.width and current_y + char_height <= self.height:
-                    self.draw_char(current_x, current_y, char, color, bg_color, scale)
-                current_x += char_width
+        for line in lines:
+            if current_y >= self.height:
+                break
                 
-                # Wrap to next line if we exceed screen width
-                if current_x + char_width > self.width:
-                    current_x = x
+            if line.strip():  # Only process non-empty lines
+                # Clip line to screen width
+                if x >= self.width:
                     current_y += char_height
+                    continue
                     
-                # Stop if we exceed screen height
-                if current_y + char_height > self.height:
-                    break
+                visible_chars = min(len(line), (self.width - x) // char_width)
+                if visible_chars <= 0:
+                    current_y += char_height
+                    continue
+                
+                actual_line_width = visible_chars * char_width
+                
+                # Clip height to screen bounds
+                actual_line_height = min(char_height, self.height - current_y)
+                if actual_line_height <= 0:
+                    current_y += char_height
+                    continue
+                
+                # Create buffer for entire line
+                line_buffer = bytearray(actual_line_width * actual_line_height * 2)
+                
+                # Fill with background color if specified
+                if bg_color is not None:
+                    bg_high = bg_color >> 8
+                    bg_low = bg_color & 0xFF
+                    for i in range(0, len(line_buffer), 2):
+                        line_buffer[i] = bg_high
+                        line_buffer[i + 1] = bg_low
+                
+                # Draw each character into the line buffer
+                for char_idx, char in enumerate(line[:visible_chars]):
+                    char = char.upper()
+                    if char not in self.font_8x8:
+                        char = '?'
+                    
+                    font_data = self.font_8x8[char]
+                    char_x_offset = char_idx * char_width
+                    
+                    # Draw character into line buffer with proper scaling
+                    for row in range(8):
+                        for col in range(8):
+                            if font_data[row] & (1 << (7 - col)):
+                                # Calculate the scaled pixel range for this font pixel
+                                start_x = char_x_offset + round(col * scale)
+                                end_x = char_x_offset + round((col + 1) * scale)
+                                start_y = round(row * scale)
+                                end_y = round((row + 1) * scale)
+                                
+                                # Fill the scaled pixel area
+                                for pixel_y in range(start_y, min(end_y, actual_line_height)):
+                                    for pixel_x in range(start_x, min(end_x, actual_line_width)):
+                                        if pixel_x < actual_line_width and pixel_y < actual_line_height:
+                                            buffer_index = (pixel_y * actual_line_width + pixel_x) * 2
+                                            line_buffer[buffer_index] = color >> 8
+                                            line_buffer[buffer_index + 1] = color & 0xFF
+                
+                # Send entire line at once
+                self._write_buffer_to_window(x, current_y, actual_line_width, actual_line_height, line_buffer)
+            
+            current_y += char_height
     
     def draw_text_centered(self, y, text, color, bg_color=None, scale=1):
         """Draw text centered horizontally at the given y position"""
-        char_width = 8 * scale
+        char_width = round(8 * scale)
         text_width = len(text) * char_width
         x = (self.width - text_width) // 2
         self.draw_text(x, y, text, color, bg_color, scale)
     
-    def clear(self, color=0x0000):
-        """Clear screen to black (or specified color)"""
-        self.fill_screen(color)
     
     def draw_bitmap(self, x, y, bitmap_data, width, height, color, bg_color=None):
-        """Draw a bitmap icon at position (x, y)"""
-        for row in range(height):
-            for col in range(width):
-                pixel_x = x + col
-                pixel_y = y + row
+        """Draw a bitmap icon at position (x, y) using 10-line buffering"""
+        if x >= self.width or y >= self.height:
+            return
+            
+        clip_width = min(width, self.width - x) if x >= 0 else min(width + x, self.width)
+        clip_height = min(height, self.height - y) if y >= 0 else min(height + y, self.height)
+        
+        if clip_width <= 0 or clip_height <= 0:
+            return
+        
+        # Process bitmap in chunks of 100 lines max
+        lines_per_chunk = min(100, clip_height)
+        
+        for chunk_start in range(0, clip_height, lines_per_chunk):
+            chunk_height = min(lines_per_chunk, clip_height - chunk_start)
+            
+            if bg_color is not None:
+                # With background: create buffer for chunk
+                buffer = bytearray(clip_width * chunk_height * 2)
                 
-                if pixel_x >= self.width or pixel_y >= self.height or pixel_x < 0 or pixel_y < 0:
-                    continue
+                for row_in_chunk in range(chunk_height):
+                    bitmap_row = chunk_start + row_in_chunk
+                    if bitmap_row >= height:
+                        continue
+                        
+                    for col in range(clip_width):
+                        if col >= width:
+                            continue
+                            
+                        byte_index = (bitmap_row * width + col) // 8
+                        bit_index = 7 - ((bitmap_row * width + col) % 8)
+                        buffer_index = (row_in_chunk * clip_width + col) * 2
+                        
+                        if byte_index < len(bitmap_data) and bitmap_data[byte_index] & (1 << bit_index):
+                            # Foreground pixel
+                            buffer[buffer_index] = color >> 8
+                            buffer[buffer_index + 1] = color & 0xFF
+                        else:
+                            # Background pixel
+                            buffer[buffer_index] = bg_color >> 8
+                            buffer[buffer_index + 1] = bg_color & 0xFF
                 
-                byte_index = (row * width + col) // 8
-                bit_index = 7 - ((row * width + col) % 8)
-                
-                if byte_index < len(bitmap_data):
-                    if bitmap_data[byte_index] & (1 << bit_index):
-                        self.draw_pixel(pixel_x, pixel_y, color)
-                    elif bg_color is not None:
-                        self.draw_pixel(pixel_x, pixel_y, bg_color)
+                # Send chunk
+                chunk_y = y + chunk_start
+                if chunk_y < self.height:
+                    self._write_buffer_to_window(x, chunk_y, clip_width, chunk_height, buffer)
+            else:
+                # Transparent background: collect foreground pixels into row segments
+                for row_in_chunk in range(chunk_height):
+                    bitmap_row = chunk_start + row_in_chunk
+                    if bitmap_row >= height:
+                        continue
+                    
+                    row_y = y + bitmap_row
+                    if row_y >= self.height or row_y < 0:
+                        continue
+                    
+                    # Find continuous segments of pixels in this row
+                    col = 0
+                    while col < width:
+                        # Skip to next foreground pixel
+                        while col < width:
+                            pixel_x = x + col
+                            if pixel_x >= self.width:
+                                break
+                            if pixel_x >= 0:
+                                byte_index = (bitmap_row * width + col) // 8
+                                bit_index = 7 - ((bitmap_row * width + col) % 8)
+                                if byte_index < len(bitmap_data) and bitmap_data[byte_index] & (1 << bit_index):
+                                    break
+                            col += 1
+                        
+                        if col >= width:
+                            break
+                        
+                        # Find end of continuous segment
+                        segment_start = col
+                        while col < width:
+                            pixel_x = x + col
+                            if pixel_x >= self.width:
+                                break
+                            byte_index = (bitmap_row * width + col) // 8
+                            bit_index = 7 - ((bitmap_row * width + col) % 8)
+                            if byte_index >= len(bitmap_data) or not (bitmap_data[byte_index] & (1 << bit_index)):
+                                break
+                            col += 1
+                        
+                        # Draw segment if valid
+                        segment_length = col - segment_start
+                        if segment_length > 0:
+                            segment_x = x + segment_start
+                            if segment_x >= 0 and segment_x < self.width:
+                                # Create buffer for this segment
+                                segment_buffer = bytearray(segment_length * 2)
+                                for i in range(0, len(segment_buffer), 2):
+                                    segment_buffer[i] = color >> 8
+                                    segment_buffer[i + 1] = color & 0xFF
+                                self._write_buffer_to_window(segment_x, row_y, segment_length, 1, segment_buffer)
 
     def draw_tea_registered(self):
-        self.clear()
+        self.fill_screen(BLACK)
         x = (self.width - 64) // 2
         y = ((self.height - 64) // 2) - 20
-        self.draw_bitmap(x, (y-10), TEA_BITMAP, width=64, height=64, color=WHITE)
-        self.draw_text_centered((y + 10 + 64), "TEA REGISTERED", WHITE)
+        self.draw_bitmap(x, (y-10), TEA_BITMAP, width=64, height=64, color=TEA, bg_color=BLACK)
+        self.draw_text_centered((y + 10 + 64), "TEA REGISTERED", DARK_TEA, scale=2)
         time.sleep(2)
 
     def draw_coffee_registered(self):
-        self.clear()
+        self.fill_screen(BLACK)
         x = (self.width - 64) // 2
         y = ((self.height - 64) // 2) - 20
-        self.draw_bitmap(x, (y - 10), COFFEE_BITMAP, width=64, height=64, color=WHITE)
+        self.draw_bitmap(x, (y - 10), COFFEE_BITMAP, width=64, height=64, color=COFFEE, bg_color=BLACK)
         
-        self.draw_text_centered((y + 10 + 64), "COFFEE REGISTERED", WHITE)
+        self.draw_text_centered((y + 10 + 64), "COFFEE REGISTERED", DARK_COFFEE, scale=1)
         time.sleep(2)
 
     def draw_undo(self):
-        self.clear()
+        self.fill_screen(BLACK)
         x = (self.width - 64) // 2
         y = ((self.height - 64) // 2) - 20
-        self.draw_bitmap(x, (y - 10), UNDO_BITMAP, width=64, height=64, color=WHITE)
+        self.draw_bitmap(x, (y - 10), UNDO_BITMAP, width=64, height=64, color=WHITE, bg_color=BLACK)
         
         self.draw_text_centered((y + 10 + 64), "UNDONE LAST DRINK", WHITE)
         time.sleep(2)
 
     def home_screen(self, username, teas, coffees):
-        self.clear()
+        self.fill_screen(BLACK)
         line1 = f"{username}'s Drinks" if username[-1] not in "sS" else f"{username}' Drinks"
         line2 = f"Teas drunk: {teas}"
         line3 = f"Coffees drunk: {coffees}"
@@ -624,13 +722,13 @@ class ManualGC9A01:
         self.draw_text_centered(150, line3, WHITE)
     
     def undo_failed(self):
-        self.clear()
+        self.fill_screen(BLACK)
         self.draw_text_centered(120, "UNDO NOT POSSIBLE", WHITE)
         self.draw_text_centered(130, "TOO LONG SINCE LAST DRINK", WHITE)
         time.sleep(2)
 
     def welcome(self, username):
-        self.clear()
+        self.fill_screen(BLACK)
         self.draw_text_centered(120, f"WELCOME {username}", WHITE)
         time.sleep(3)
         
@@ -648,19 +746,16 @@ if __name__ == "__main__":
         backlight=Pin(0, Pin.OUT)
     )
     
-    # Colors (RGB565 format)
-    BLACK = 0x0000
-    WHITE = 0xFFFF
-    RED = 0xF800
-    GREEN = 0x07E0
-    BLUE = 0x001F
-    YELLOW = 0xFFE0
-    MAGENTA = 0xF81F
-    CYAN = 0x07FF
+    TEA = 0xC428
+    DARK_TEA = 0x8AE5
+    COFFEE = 0x9240
+    DARK_COFFEE = 0x69A0
     
     # Clear screen
-    display.clear(BLACK)
+    display.fill_screen(BLACK)
     
     display.draw_tea_registered()
     display.draw_coffee_registered()
     display.draw_undo()
+    display.undo_failed()
+    display.home_screen("louis", 10, 10)
