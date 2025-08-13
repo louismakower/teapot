@@ -35,12 +35,14 @@ Hardware: [WIZnet W5500-EVB-Pico](https://thepihut.com/products/wiznet-w5100s-ev
 ## Edit username, add IP address and upload:
 1. Install the raspbery pi pico extension in VSCode.  Follow this [guide](https://www.hackster.io/Shilleh/how-to-use-vscode-with-raspberry-pi-pico-w-and-micropython-de88d6
 ) if necessary.
-2. Copy the files inside [`pico_stuff`](./pico_stuff) to a workspace.
-2. Change the **username** to your own name.
-3. Add the **IP** and **port** being used for the server.
-4. In the REPL, test `import urequests`.  If you get an error, then you need to install it manually.  See the note at the bottom.
-5. Save the [main script](pico_stuff/main.py) on the pico, making sure it is saved as `main.py.`  In VSCode, this is done by right-clicking the file and selecting **Upload File to Pico**.
-6. Save the [display script](pico_stuff/display.py), making sure it is saved as `display.py`.
+2. Connect to the Pico by pressing `Ctrl + Shift + P`, and executing **MicroPico: Connect**
+3. Copy the files inside [`pico_stuff`](./pico_stuff) to a workspace.
+4. Change the **username** to your own name.
+5. Add the **IP** and **port** being used for the server.
+6. In the REPL, test `import urequests`.  If you get an error, then you need to install it manually.  See the note at the bottom.
+7. Save the [main script](pico_stuff/main.py) on the pico, making sure it is saved as `main.py.`  In VSCode, this is done by right-clicking the file and selecting **Upload File to Pico**.
+8. Save the [display script](pico_stuff/display.py), making sure it is saved as `display.py`.
+9. If you want to create new icons, you can use the [`convert_images.py`](pico_stuff/convert_images.py) to do so.
 
 ## Installing `urequests` (Only if Needed)
 
