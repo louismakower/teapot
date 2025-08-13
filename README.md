@@ -37,8 +37,8 @@ Hardware: [WIZnet W5500-EVB-Pico](https://thepihut.com/products/wiznet-w5100s-ev
 ) if necessary.
 2. Connect to the Pico by pressing `Ctrl + Shift + P`, and executing **MicroPico: Connect**
 3. Copy the `main.py` and `display.py` files inside [`pico_stuff`](./pico_stuff) to a workspace.
-4. Change the **username** to your own name.
-5. Add the **IP** and **port** being used for the server.
+4. Change the **username** in `main.py` to your own name.
+5. Add the **IP** and **port** in `main.py` being used for the server.
 6. In the REPL, test `import urequests`.  If you get an error, then you need to install it manually.  See the note at the bottom.
 7. Save the [main script](pico_stuff/main.py) on the pico, making sure it is saved as `main.py.`  In VSCode, this is done by right-clicking the file and selecting **Upload File to Pico**.
 8. Save the [display script](pico_stuff/display.py), making sure it is saved as `display.py`.
