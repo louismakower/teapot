@@ -1,4 +1,4 @@
-Hardware: [WIZnet W5500-EVB-Pico](https://thepihut.com/products/wiznet-w5100s-evb-pico-rp2040-board-with-ethernet?srsltid=AfmBOooQ7SRgiXSiHIm8nm7YFBl2_ydEktIVkSzv2TyWrW6W12kUSfSE), [WIZnet WIZPoE](https://thepihut.com/products/wiznet-wizpoe-p1-poe-module) & [Waveshare 1.28 inch LCD](https://thepihut.com/products/round-1-28-lcd-display-module-240x240-ips-65k-rgb)
+Hardware: [WIZnet W5500-EVB-Pico](https://thepihut.com/products/wiznet-w5100s-evb-pico-rp2040-board-with-ethernet?srsltid=AfmBOooQ7SRgiXSiHIm8nm7YFBl2_ydEktIVkSzv2TyWrW6W12kUSfSE), [WIZnet WIZPoE](https://thepihut.com/products/wiznet-wizpoe-p1-poe-module) & [Waveshare 1.28 inch LCD](https://thepihut.com/products/round-1-28-lcd-display-module-240x240-ips-65k-rgb).
 
 ## Hardware steps
 1. Add the POE component.
