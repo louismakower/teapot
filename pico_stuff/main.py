@@ -2,10 +2,10 @@ from machine import Pin, SPI
 import time
 import network
 import urequests
-from display import ManualGC9A01
+from pico_stuff.display import Display
 
 spi = SPI(1, baudrate=10000000, sck=Pin(14), mosi=Pin(11))
-screen = ManualGC9A01(
+screen = Display(
     spi=spi,
     dc=Pin(4, Pin.OUT),
     cs=Pin(13, Pin.OUT), 
@@ -17,8 +17,8 @@ screen = ManualGC9A01(
 USER_NAME = "doug"
 
 # api access
-SERVER_IP = None
-PORT = None
+SERVER_IP = "192.168.101.197"
+PORT = "8000"
 API_URL = f"http://{SERVER_IP}:{PORT}"
 
 # Simple switch setup
@@ -41,27 +41,33 @@ def switch_handler(pin):
 
 def setup_ethernet():
     """Connect to internet via ethernet"""
-    print("Connecting to ethernet...")
-    
-    # Setup W5500 ethernet chip
-    spi = SPI(0, baudrate=2000000, sck=Pin(18), mosi=Pin(19), miso=Pin(16))
-    nic = network.WIZNET5K(spi, Pin(17), Pin(20))
-    nic.active(True)
-    nic.ifconfig('dhcp')  # Get IP address automatically
-    
-    # Wait for connection
-    for i in range(10):
-        if nic.isconnected():
-            print("Connected! IP address:", nic.ifconfig()[0])
-            return True
-        print(f"Waiting... ({i+1}/10)")
-        time.sleep(1)
-    
-    print("Failed to connect")
-    return False
+    try:
+        print("Connecting to ethernet...")
+        
+        # Setup W5500 ethernet chip
+        spi = SPI(0, baudrate=2000000, sck=Pin(18), mosi=Pin(19), miso=Pin(16))
+        nic = network.WIZNET5K(spi, Pin(17), Pin(20))
+        nic.active(True)
+        nic.ifconfig('dhcp')  # Get IP address automatically
+        
+        # Wait for connection
+        for i in range(10):
+            if nic.isconnected():
+                print("Connected! IP address:", nic.ifconfig()[0])
+                return True
+            print(f"Waiting... ({i+1}/10)")
+            time.sleep(1)
+        
+        print("Failed to connect")
+        return False
+    except Exception as e:
+        print(e)
+        screen.error_message(str(e))
+        return False
 
 def send_click(drink_type: str):
     """Send a click to the server"""
+    screen.status(f"Sending {drink_type}...")
     try:
         url = f"{API_URL}/{USER_NAME}/{drink_type}"
         print(f"Sending drink to: {url}")
@@ -75,10 +81,12 @@ def send_click(drink_type: str):
         
     except Exception as e:
         print(f"Error: {e}")
+        screen.error_message(f"Error: {str(e)}")
         return False
 
 def send_undo():
     """Send an undo to the server"""
+    screen.status("Sending undo...")
     try:
         url = f"{API_URL}/{USER_NAME}/undo"
         print(f"Sending undo to: {url}")
@@ -86,16 +94,17 @@ def send_undo():
         response = urequests.post(url)
         result = response.json()
         if result["success"]:
-        
             print(f"Success! {result['message']}")
             response.close()
             return True
         else:
             print(f"failed: {result['message']}")
+            screen.error_message(f"Failed: {result['message']}")
             return False
         
     except Exception as e:
         print(f"Error: {e}")
+        screen.error_message(f"Error: {str(e)}")
         return False
 
 def get_user_data():
@@ -121,8 +130,8 @@ if __name__ == "__main__":
     print(f"Starting click counter for user: {USER_NAME}")
 
     # Connect to internet
-    if not setup_ethernet():
-        print("Cannot start without internet")
+    while not setup_ethernet():
+        screen.error_message("Cannot start without internet")
         while True:
             time.sleep(1)
 
