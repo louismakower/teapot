@@ -6,9 +6,7 @@ Replaces display.py functionality with new driver interface
 from machine import Pin, SPI
 import time
 import driver
-import tea_bitmap
-import coffee_bitmap
-import undo_bitmap
+import tea_bitmap, coffee_bitmap, undo_bitmap
 import vga2_8x8 as font_8pt
 import vga2_16x16 as font_16pt
 
