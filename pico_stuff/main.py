@@ -151,7 +151,7 @@ def update_home_screen():
         if all_data["coffee"] in (100, 200, 300, 500, 1000, 5000):
             screen.celebrate([
                 "Wooooo!1!11!",
-                f"Matta have had {all_data["coffees"]} coffees!"
+                f"Matta have had {all_data["coffee"]} coffees!"
             ])
     if user_success:
         screen.home_screen(USER_NAME, user_data["tea"], user_data["coffee"])
