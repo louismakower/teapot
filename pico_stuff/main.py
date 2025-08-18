@@ -2,7 +2,7 @@ from machine import Pin, SPI
 import time
 import network
 import urequests
-from pico_stuff.display import Display
+from display import Display
 
 spi = SPI(1, baudrate=10000000, sck=Pin(14), mosi=Pin(11))
 screen = Display(
