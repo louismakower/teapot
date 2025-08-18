@@ -180,7 +180,7 @@ def get_user_stats(username: str):
         "coffee": coffee_count,
     }
 
-@app.get("/stats/all")
+@app.get("/stats_all")
 def get_all_stats():
     all_data = {
         "tea": 0,

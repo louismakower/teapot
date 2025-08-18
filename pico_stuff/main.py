@@ -12,6 +12,7 @@ screen = Display(
     reset=Pin(6, Pin.OUT),
     backlight=Pin(0, Pin.OUT)
 )
+screen.error_message("Loading...")
 
 # CHANGE THIS FOR EACH DEVICE
 USER_NAME = "doug"
@@ -23,7 +24,7 @@ API_URL = f"http://{SERVER_IP}:{PORT}"
 
 # Simple switch setup
 switch_pressed = False
-debounce_time = 200 # 200 ms
+debounce_time = 50 # 200 ms
 last_interrupt_time = 0
 
 def switch_handler(pin):
@@ -119,10 +120,40 @@ def get_user_data():
     except Exception as e:
         print(f"error: {e}")
         return False, {}
+    
+def get_all_data():
+    try:
+        url = f"{API_URL}/stats_all"
+        response = urequests.get(url)
+        result = response.json()
+        return True, result
+    except Exception as e:
+        print(f"error: {e}")
+        return False, {}
 
 def update_home_screen():
-    success, user_data = get_user_data()
-    if success:
+    user_success, user_data = get_user_data()
+    all_success, all_data = get_all_data()
+
+    if all_success:
+        total = all_data["tea"] + all_data["coffee"]
+        if total in (100, 200, 300, 500, 1000, 5000):
+            screen.celebrate([
+                "Wooooo!1!11!",
+                f"Matta have had {total} drinks!"
+            ])
+        if all_data["tea"] in (100, 200, 300, 500, 1000, 5000):
+            screen.celebrate([
+                "Wooooo!1!11!",
+                f"Matta have had {total} teas!"
+            ])
+
+        if all_data["coffee"] in (100, 200, 300, 500, 1000, 5000):
+            screen.celebrate([
+                "Wooooo!1!11!",
+                f"Matta have had {total} coffees!"
+            ])
+    if user_success:
         screen.home_screen(USER_NAME, user_data["tea"], user_data["coffee"])
 
 
@@ -171,6 +202,7 @@ if __name__ == "__main__":
                     break
                 time.sleep(0.01)
             else:
+                switch_pressed = False
                 # Button was released - check for double click
                 double_count_timer = time.ticks_ms()
                 double_click = False

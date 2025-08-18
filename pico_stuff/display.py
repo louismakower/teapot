@@ -17,7 +17,13 @@ COFFEE = 0xbc48
 DARK_COFFEE = 0x69A0
 BLACK = 0x0000
 WHITE = 0xFFFF
-RED = 0xf800
+RED = 0xF800
+ORANGE = 0xFD20
+YELLOW = 0xFFE0
+GREEN = 0x07E0
+BLUE = 0x001F
+INDIGO = 0x4810
+VIOLET = 0x8010
 
 class Display:
     def __init__(self, spi, dc, cs, reset, backlight):
@@ -200,6 +206,57 @@ class Display:
             y_pos = start_y + i * line_height
             self.draw_text_centred(y_pos, line, WHITE)
 
+    def celebrate(self, message_lines, sleep_time=10):
+        colours = [RED, ORANGE, YELLOW, GREEN, BLUE, INDIGO, VIOLET]
+        self.display.fill(BLACK)
+        
+        # Use 16pt font
+        font = font_16pt
+        
+        # Process each line in the list, splitting if needed to max 12 characters
+        lines = []
+        for line in message_lines:
+            words = line.split(" ")
+            current_line = ""
+            
+            for word in words:
+                # Check if adding this word would exceed 12 characters
+                if len(current_line + " " + word) <= 12:
+                    if current_line:
+                        current_line += " " + word
+                    else:
+                        current_line = word
+                else:
+                    # Current line is full, start a new one
+                    if current_line:
+                        lines.append(current_line)
+                    current_line = word
+            
+            # Don't forget the last line of this message line
+            if current_line:
+                lines.append(current_line)
+        
+        # Calculate starting Y position to center all lines vertically
+        line_height = font.HEIGHT + 2  # Add small gap between lines
+        total_height = len(lines) * line_height
+        start_y = (self.height - total_height) // 2
+        
+        # Draw each line centered with colored characters
+        color_index = 0
+        for line_num, line in enumerate(lines):
+            # Calculate line width for centering
+            line_width = len(line) * font.WIDTH
+            start_x = (self.width - line_width) // 2
+            y = start_y + line_num * line_height
+            
+            # Draw each character in the line with cycling colors
+            for char_pos, character in enumerate(line):
+                color = colours[color_index % len(colours)]
+                x = start_x + char_pos * font.WIDTH
+                self.display.text(font, character, x, y, color)
+                color_index += 1
+        time.sleep(sleep_time)
+
 def capitalise(self):
     return self[0].upper() + self[1:]
 
@@ -221,4 +278,7 @@ if __name__ == "__main__":
     # display.draw_coffee_registered()
     # display.draw_undo()
     # display.undo_failed()
-    display.home_screen("louis", 10, 10)
+    display.celebrate([
+                "Wooooo!1!11!",
+                f"Matta have had {100} drinks!"
+            ])
