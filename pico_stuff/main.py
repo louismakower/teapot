@@ -15,7 +15,7 @@ screen = Display(
 screen.error_message("Loading...")
 
 # CHANGE THIS FOR EACH DEVICE
-USER_NAME = "doug"
+USER_NAME = "matt".lower()
 
 # api access
 SERVER_IP = "192.168.101.197"
@@ -145,13 +145,13 @@ def update_home_screen():
         if all_data["tea"] in (100, 200, 300, 500, 1000, 5000):
             screen.celebrate([
                 "Wooooo!1!11!",
-                f"Matta have had {total} teas!"
+                f"Matta have had {all_data["tea"]} teas!"
             ])
 
         if all_data["coffee"] in (100, 200, 300, 500, 1000, 5000):
             screen.celebrate([
                 "Wooooo!1!11!",
-                f"Matta have had {total} coffees!"
+                f"Matta have had {all_data["coffees"]} coffees!"
             ])
     if user_success:
         screen.home_screen(USER_NAME, user_data["tea"], user_data["coffee"])
