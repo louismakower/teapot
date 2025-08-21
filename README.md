@@ -56,6 +56,16 @@ Hardware: [WIZnet W5500-EVB-Pico](https://thepihut.com/products/wiznet-w5100s-ev
 
 9. If you want to create new icons, you can use the [`convert_images.py`](pico_stuff/original_images/convert_images.py) to do so.
 
+## MQTT instructions
+1. On the pi / API server device, install moquitto.  Then edit the config file found at `/etc/mosquitto/conquitto.conf` by adding the lines:
+
+```
+listener 1883 0.0.0.0
+allow_anonymouse true
+```
+
+2. Run `systemctl start moquitto`, then `systemctl enable mosquitto`.
+
 ## Installing `urequests` (Only if Needed)
 
 > **Note:** Most newer firmware versions already include `urequests`. If you get an error saying `urequests` not found, follow these steps, otherwise you can ignore this.  Info from [here](https://github.com/thonny/thonny/issues/2947).
@@ -64,3 +74,5 @@ Hardware: [WIZnet W5500-EVB-Pico](https://thepihut.com/products/wiznet-w5100s-ev
 2. Install pipkin: `pip install pipkin`
 3. Use pipkin to install urequests on the pico:
     In a fresh terminal (make sure nothing else is connecting to the pico), run: `pipkin install urequests`
+
+

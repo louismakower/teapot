@@ -3,29 +3,62 @@ import time
 import network
 import urequests
 from display import Display
+from mqtt import MQTTClient
+import json
+from setup import USER_NAME, SERVER_IP, PORT, MQTT_BROKER, MQTT_TOPIC
 
-spi = SPI(1, baudrate=10000000, sck=Pin(14), mosi=Pin(11))
-screen = Display(
-    spi=spi,
-    dc=Pin(4, Pin.OUT),
-    cs=Pin(13, Pin.OUT), 
-    reset=Pin(6, Pin.OUT),
-    backlight=Pin(0, Pin.OUT)
-)
-screen.error_message("Loading...")
-
-# CHANGE THIS FOR EACH DEVICE
-USER_NAME = "matt".lower()
-
-# api access
-SERVER_IP = "192.168.101.197"
-PORT = "8000"
 API_URL = f"http://{SERVER_IP}:{PORT}"
+message_queue = []
+mqtt_client = None
 
-# Simple switch setup
-switch_pressed = False
-debounce_time = 50 # 200 ms
-last_interrupt_time = 0
+def setup_mqtt():
+    """Setup MQTT client and subscribe"""
+    global mqtt_client
+    try:
+        client_id = f"teacounter_{USER_NAME}_{time.ticks_ms()}"
+        mqtt_client = MQTTClient(client_id, MQTT_BROKER)
+        mqtt_client.set_callback(mqtt_callback)
+        mqtt_client.connect()
+        mqtt_client.subscribe(MQTT_TOPIC)
+        print("MQTT connected and subscribed")
+        return True
+    except Exception as e:
+        print(f"MQTT failed: {str(e)}")
+        return False
+
+def mqtt_callback(topic, msg):
+    """Handle incoming MQTT messages"""
+    global message_queue
+    try:
+        data = json.loads(msg.decode())
+        print(data)
+        if data.get("type") == "message":
+            message_queue.append(data["message"])
+            print(f"Received celebration: {data['message']}")
+    except Exception as e:
+        print(f"MQTT callback error: {e}")
+
+def setup_screen():
+    global screen
+    spi = SPI(1, baudrate=10000000, sck=Pin(14), mosi=Pin(11))
+    screen = Display(
+        spi=spi,
+        dc=Pin(4, Pin.OUT),
+        cs=Pin(13, Pin.OUT), 
+        reset=Pin(6, Pin.OUT),
+        backlight=Pin(0, Pin.OUT)
+    )
+    screen.error_message("Loading...")
+
+def setup_switch():
+    global switch_pressed, debounce_time, last_interrupt_time
+    switch_pressed = False
+    debounce_time = 50 # ms
+    last_interrupt_time = 0
+
+    # Setup button
+    switch_pin = Pin(27, Pin.IN, Pin.PULL_UP)
+    switch_pin.irq(trigger=Pin.IRQ_FALLING, handler=switch_handler)
 
 def switch_handler(pin):
     """Interrupt handler with debouncing"""
@@ -41,7 +74,7 @@ def switch_handler(pin):
             last_interrupt_time = current_time
 
 def setup_ethernet():
-    """Connect to internet via ethernet"""
+    """Connect via ethernet"""
     try:
         print("Connecting to ethernet...")
         
@@ -133,26 +166,6 @@ def get_all_data():
 
 def update_home_screen():
     user_success, user_data = get_user_data()
-    all_success, all_data = get_all_data()
-
-    if all_success:
-        total = all_data["tea"] + all_data["coffee"]
-        if total in (100, 200, 300, 500, 1000, 5000):
-            screen.celebrate([
-                "Wooooo!1!11!",
-                f"Matta have had {total} drinks!"
-            ])
-        if all_data["tea"] in (100, 200, 300, 500, 1000, 5000):
-            screen.celebrate([
-                "Wooooo!1!11!",
-                f"Matta have had {all_data["tea"]} teas!"
-            ])
-
-        if all_data["coffee"] in (100, 200, 300, 500, 1000, 5000):
-            screen.celebrate([
-                "Wooooo!1!11!",
-                f"Matta have had {all_data["coffee"]} coffees!"
-            ])
     if user_success:
         screen.home_screen(USER_NAME, user_data["tea"], user_data["coffee"])
 
@@ -160,22 +173,37 @@ def update_home_screen():
 if __name__ == "__main__":
     print(f"Starting click counter for user: {USER_NAME}")
 
-    # Connect to internet
+    setup_screen()
+    setup_switch()
+
+    # Connect to api
     while not setup_ethernet():
         screen.error_message("Cannot start without internet")
         while True:
             time.sleep(1)
 
-    # Setup button
-    switch_pin = Pin(27, Pin.IN, Pin.PULL_UP)
-    switch_pin.irq(trigger=Pin.IRQ_FALLING, handler=switch_handler)
+    # connect to MQTT
+    if not setup_mqtt():
+        screen.error_message("MQTT setup failed")
+        while True:
+            time.sleep(1)
 
-    print("Ready! Press the button to send clicks")
     screen.welcome(USER_NAME)
     update_home_screen()
 
     # Main loop
     while True:
+        try:
+            print("checking messages in main loop")
+            mqtt_client.check_msg()
+        except Exception as e:
+            print(f"MQTT error: {e}")
+        print(f"messages: {message_queue}")
+        if message_queue:
+            screen.celebrate([
+                message_queue.pop(0),
+            ])
+
         if switch_pressed:
             switch_pressed = False
             press_start_time = time.ticks_ms()

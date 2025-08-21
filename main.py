@@ -1,4 +1,4 @@
-import logging
+import json
 import os
 import subprocess
 from fastapi import FastAPI
@@ -6,15 +6,32 @@ from datetime import datetime, UTC
 from pathlib import Path
 from dotenv import load_dotenv
 import threading
+import paho.mqtt.publish as publish
 
 lock = threading.Lock()
 
+# mqtt setup
+MQTT_BROKER = "192.168.101.197"
+MQTT_PORT = "1883"
+MQTT_TOPIC = "teacounter/messages"
 
+    
+def publish_message(message: str, event_type: str, count: int):
+    try:
+        payload = {
+            "type": "message",
+            "subtype": event_type,
+            "message": message,
+            "count": count,
+            "timestamp": datetime.now(UTC).isoformat()
+        }
+        publish.single(MQTT_TOPIC, payload=json.dumps(payload), hostname=MQTT_BROKER)
+        print(f"Published {message}")
+    except Exception as e:
+        print(f"MQTT publish failed: {e}")
+    
 load_dotenv()
 app = FastAPI(title="Tea counter")
-
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
 
 @app.get("/")
 def home():
@@ -111,7 +128,7 @@ def git_commit_and_push(username: str, drink_type: str):
             # Add all changes in data directory
             result = subprocess.run(["git", "add", f"data/{username}/"], cwd=Path.cwd(), capture_output=True, text=True)
             if result.returncode != 0:
-                logger.error(f"Failed to add files for {username}'s {drink_type}: {result.stderr}")
+                print(f"Failed to add files for {username}'s {drink_type}: {result.stderr}")
                 return False
             
             # Create commit message
@@ -120,20 +137,20 @@ def git_commit_and_push(username: str, drink_type: str):
             # Commit changes
             result = subprocess.run(["git", "commit", "-m", commit_message], cwd=Path.cwd(), capture_output=True, text=True)
             if result.returncode != 0:
-                logger.error(f"Failed to commit {username}'s {drink_type}: {result.stderr}")
+                print(f"Failed to commit {username}'s {drink_type}: {result.stderr}")
                 return False
             
             # Push to GitHub
             result = subprocess.run(["git", "push", "origin", "main"], cwd=Path.cwd(), capture_output=True, text=True)
             if result.returncode != 0:
-                logger.error(f"Failed to push {username}'s {drink_type}: {result.stderr}")
+                print(f"Failed to push {username}'s {drink_type}: {result.stderr}")
                 return False
                 
-            logger.info(f"Successfully pushed {username}'s {drink_type} to GitHub")
+            print(f"Successfully pushed {username}'s {drink_type} to GitHub")
             return True
         
     except Exception as e:
-        logger.error(f"Unexpected error in git operations: {str(e)}")
+        print(f"Unexpected error in git operations: {str(e)}")
         return False
     
 @app.post("/{username}/coffee")
@@ -141,12 +158,17 @@ def register_coffee(username: str):
     init_user(username)
     increment_coffee(username)
     git_success = git_commit_and_push(username, "coffee")
+    publish_message("hello world", "celebration", "3")
 
     return {
         "user": username,
         "message": "coffee registered!",
         "git_push": "success"  if git_success else "failed"
     }
+
+@app.post("/send_message/{message}")
+def send_message(message: str):
+    publish_message(message=message, event_type="celebration", count=3)
 
 @app.post("/{username}/tea")
 def register_tea(username: str):
