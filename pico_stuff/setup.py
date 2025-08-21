@@ -1,8 +1,8 @@
-USER_NAME = "doug".lower()
+USER_NAME = None
 
 # api access
-SERVER_IP = "192.168.101.197"
-PORT = "8000"
+SERVER_IP = None
+PORT = None
 
 # MQTT setup
 MQTT_BROKER = SERVER_IP
