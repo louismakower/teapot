@@ -57,7 +57,7 @@ Hardware: [WIZnet W5500-EVB-Pico](https://thepihut.com/products/wiznet-w5100s-ev
 9. If you want to create new icons, you can use the [`convert_images.py`](pico_stuff/original_images/convert_images.py) to do so.
 
 ## MQTT instructions
-1. On the pi / API server device, install moquitto.  Then edit the config file found at `/etc/mosquitto/conquitto.conf` by adding the lines:
+1. On the pi / API server device, install moquitto.  Then edit the config file found at `/etc/mosquitto/mosquitto.conf` by adding the lines:
 
 ```
 listener 1883 0.0.0.0
