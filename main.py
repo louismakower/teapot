@@ -15,6 +15,8 @@ lock = threading.Lock()
 MQTT_BROKER = "192.168.101.197"
 MQTT_TOPIC = "teacounter"
 
+MILESTONES = [100, 200, 300, 314, 400, 500, 1000]
+
 app = FastAPI(title="Tea counter")
 
 def broadcast_message(type: str, message: str):
@@ -50,6 +52,25 @@ def send_message_to_screen(message: str, targets: list[str]):
     try:
         payload = {
             "type": "message",
+            "message": message,
+            "timestamp": datetime.now(UTC).isoformat()
+        }
+        # Send to specific people
+        for screen_id in targets:
+            topic = f"{MQTT_TOPIC}/{screen_id}"
+            publish.single(topic, payload=json.dumps(payload), hostname=MQTT_BROKER)
+            print(f"Published to {screen_id}: {message}")
+
+    except Exception as e:
+        print(f"MQTT publish failed: {e}")
+
+def send_celebration_to_screen(message: str, targets: list[str]):
+    """
+    Targets is either a list of users
+    """
+    try:
+        payload = {
+            "type": "celebration",
             "message": message,
             "timestamp": datetime.now(UTC).isoformat()
         }
@@ -177,12 +198,75 @@ def git_commit_and_push(username: str, drink_type: str):
     except Exception as e:
         print(f"Unexpected error in git operations: {str(e)}")
         return False
+
+def get_user_stats(username: str):
+    tea_count = count_lines_in_file(Path(f"data/{username}/tea.txt"))
+    coffee_count = count_lines_in_file(Path(f"data/{username}/coffee.txt"))
+    return {"tea": tea_count, "coffee": coffee_count}
+
+def get_all_stats(curr_user=None):
+    all_data = {
+        "user": curr_user,
+        "all_tea": 0,
+        "all_coffee": 0
+    }
+
+    for user in os.listdir("data"):
+        user_data = get_user_stats(user)
+        all_data["all_coffee"] += user_data["coffee"]
+        all_data["all_tea"] += user_data["tea"]
+
+        if user == curr_user:
+            all_data["user_coffee"] = user_data["coffee"]
+            all_data["user_tea"] = user_data["tea"]
     
+    return all_data
+
+def is_prime(n: int) -> bool:
+    """Check if a number is prime."""
+    if n < 2:
+        return False
+    if n in (2, 3):
+        return True
+    if n % 2 == 0 or n % 3 == 0:
+        return False
+    i = 5
+    while i * i <= n:
+        if n % i == 0 or n % (i + 2) == 0:
+            return False
+        i += 6
+    return True
+
+def are_twin_primes(a: int, b: int) -> bool:
+    """Check if two numbers are twin primes."""
+    return abs(a - b) == 2 and is_prime(a) and is_prime(b)
+
+def celebrate_twin_primes(user):
+    user_stats = get_user_stats(user)
+    print(user_stats)
+    if are_twin_primes(user_stats["tea"], user_stats["coffee"]):
+        send_celebration_to_screen("Your teas and coffees are twin primes !!", targets=[user])
+
+def check_celebrations():
+    all_stats = get_all_stats()
+    
+    if all_stats["all_tea"] in MILESTONES:
+        broadcast_celebration(f"WOOO!11!11 MATTA HAVE HAD {all_stats['all_tea']} teas!")
+    
+    if all_stats["all_coffee"] in MILESTONES:
+        broadcast_celebration(f"WOOO!11!11 MATTA HAVE HAD {all_stats['all_coffee']} coffees!")
+
+class MessageRequest(BaseModel):
+    users: List[str] | Literal["all"] # can be "all" or a list of usernames
+    message: str
+
 @app.post("/{username}/coffee")
 def register_coffee(username: str):
     init_user(username)
     increment_coffee(username)
     git_success = git_commit_and_push(username, "coffee")
+    check_celebrations()
+    celebrate_twin_primes(username)
 
     return {
         "user": username,
@@ -190,9 +274,19 @@ def register_coffee(username: str):
         "git_push": "success"  if git_success else "failed"
     }
 
-class MessageRequest(BaseModel):
-    users: List[str] | Literal["all"] # can be "all" or a list of usernames
-    message: str
+@app.post("/{username}/tea")
+def register_tea(username: str):
+    init_user(username)
+    increment_tea(username)
+    git_success = git_commit_and_push(username, "tea")
+    check_celebrations()
+    celebrate_twin_primes(username)
+
+    return {
+        "user": username,
+        "message": "tea registered!",
+        "git_push": "success"  if git_success else "failed"
+    }
 
 @app.post("/send_message")
 def send_message(req: MessageRequest):
@@ -206,18 +300,6 @@ def send_message(req: MessageRequest):
             message=req.message,
             targets=req.users,
         )
-
-@app.post("/{username}/tea")
-def register_tea(username: str):
-    init_user(username)
-    increment_tea(username)
-    git_success = git_commit_and_push(username, "tea")
-
-    return {
-        "user": username,
-        "message": "tea registered!",
-        "git_push": "success"  if git_success else "failed"
-    }
 
 @app.get("/stats/{username}")
 def get_stats(username: str):
@@ -235,29 +317,6 @@ def get_stats(username: str):
         }
     
     return all_stats
-
-def get_user_stats(username: str):
-    tea_count = count_lines_in_file(Path(f"data/{username}/tea.txt"))
-    coffee_count = count_lines_in_file(Path(f"data/{username}/coffee.txt"))
-    return {"tea": tea_count, "coffee": coffee_count}
-
-def get_all_stats(curr_user):
-    all_data = {
-        "user": curr_user,
-        "all_tea": 0,
-        "all_coffee": 0
-    }
-
-    for user in os.listdir("data"):
-        user_data = get_user_stats(user)
-        all_data["all_coffee"] += user_data["coffee"]
-        all_data["all_tea"] += user_data["tea"]
-
-        if user == curr_user:
-            all_data["user_coffee"] = user_data["coffee"]
-            all_data["user_tea"] = user_data["tea"]
-    
-    return all_data
 
 @app.post("/{username}/undo")
 def undo_last_drink(username: str):

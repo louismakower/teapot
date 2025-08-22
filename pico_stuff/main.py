@@ -157,7 +157,6 @@ def get_user_data():
         print(f"error: {e}")
         return False, {}
 
-
 def update_home_screen():
     user_success, user_data = get_user_data()
     if user_success:
