@@ -16,7 +16,7 @@ MQTT_BROKER = "192.168.101.197"
 MQTT_TOPIC = "teacounter"
 
 app = FastAPI(title="Tea counter")
-    
+
 def broadcast_message(type: str, message: str):
     try:
         payload = {
