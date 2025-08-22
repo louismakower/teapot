@@ -173,7 +173,7 @@ class Display:
         """Display status message at the top of the screen"""
         self.draw_text_centred(22, message, RED, font_size=8)
 
-    def message(self, message, sleep_time=10):
+    def message(self, message, display_time=10):
         self.display.fill(BLACK)
         lines = []
         words = message.split(" ")
@@ -205,9 +205,9 @@ class Display:
         for i, line in enumerate(lines):
             y_pos = start_y + i * line_height
             self.draw_text_centred(y_pos, line, WHITE)
-        time.sleep(sleep_time)
+        time.sleep(display_time)
 
-    def celebrate(self, message, sleep_time=10):
+    def celebrate(self, message, display_time=10):
         colours = [RED, ORANGE, YELLOW, GREEN, BLUE, INDIGO, VIOLET]
         self.display.fill(BLACK)
         
@@ -255,7 +255,7 @@ class Display:
                 x = start_x + char_pos * font.WIDTH
                 self.display.text(font, character, x, y, color)
                 color_index += 1
-        time.sleep(sleep_time)
+        time.sleep(display_time)
 
 def capitalise(text):
     return text[0].upper() + text[1:]

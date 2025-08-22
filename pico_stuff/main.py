@@ -19,7 +19,7 @@ def setup_mqtt():
     """Setup MQTT client and subscribe"""
     global mqtt_client
     try:
-        client_id = f"teacounter_{USER_NAME}_{time.ticks_ms()}"
+        client_id = f"teacounter_{USER_NAME}"
         mqtt_client = MQTTClient(client_id, MQTT_BROKER)
         mqtt_client.set_callback(mqtt_callback)
         mqtt_client.connect()
@@ -152,10 +152,7 @@ def get_user_data():
         url = f"{API_URL}/stats/{USER_NAME}"
         response = urequests.get(url)
         result = response.json()
-        return True, {
-            "tea": result["user_tea"],
-            "coffee": result["user_coffee"]
-        }
+        return True, result
     except Exception as e:
         print(f"error: {e}")
         return False, {}
@@ -191,15 +188,16 @@ if __name__ == "__main__":
     # Main loop
     while True:
         try:
-            print("checking messages in main loop")
             mqtt_client.check_msg()
         except Exception as e:
             print(f"MQTT error: {e}")
         print(f"messages: {message_queue}")
         if message_queue:
             screen.message(message_queue.pop(0))
+            update_home_screen()
         if celebration_queue:
             screen.celebrate(celebration_queue.pop(0))
+            update_home_screen()
 
         if switch_pressed:
             switch_pressed = False
