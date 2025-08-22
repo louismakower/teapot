@@ -173,7 +173,7 @@ class Display:
         """Display status message at the top of the screen"""
         self.draw_text_centred(22, message, RED, font_size=8)
 
-    def error_message(self, message):
+    def message(self, message, sleep_time=10):
         self.display.fill(BLACK)
         lines = []
         words = message.split(" ")
@@ -205,36 +205,36 @@ class Display:
         for i, line in enumerate(lines):
             y_pos = start_y + i * line_height
             self.draw_text_centred(y_pos, line, WHITE)
+        time.sleep(sleep_time)
 
-    def celebrate(self, message_lines, sleep_time=10):
+    def celebrate(self, message, sleep_time=10):
         colours = [RED, ORANGE, YELLOW, GREEN, BLUE, INDIGO, VIOLET]
         self.display.fill(BLACK)
         
         # Use 16pt font
         font = font_16pt
         
-        # Process each line in the list, splitting if needed to max 12 characters
+        # Split message into words and create lines with max 12 characters
         lines = []
-        for line in message_lines:
-            words = line.split(" ")
-            current_line = ""
-            
-            for word in words:
-                # Check if adding this word would exceed 12 characters
-                if len(current_line + " " + word) <= 12:
-                    if current_line:
-                        current_line += " " + word
-                    else:
-                        current_line = word
+        words = message.split(" ")
+        current_line = ""
+        
+        for word in words:
+            # Check if adding this word would exceed 12 characters
+            if len(current_line + " " + word) <= 12:
+                if current_line:
+                    current_line += " " + word
                 else:
-                    # Current line is full, start a new one
-                    if current_line:
-                        lines.append(current_line)
                     current_line = word
-            
-            # Don't forget the last line of this message line
-            if current_line:
-                lines.append(current_line)
+            else:
+                # Current line is full, start a new one
+                if current_line:
+                    lines.append(current_line)
+                current_line = word
+        
+        # Don't forget the last line
+        if current_line:
+            lines.append(current_line)
         
         # Calculate starting Y position to center all lines vertically
         line_height = font.HEIGHT + 2  # Add small gap between lines
@@ -257,8 +257,8 @@ class Display:
                 color_index += 1
         time.sleep(sleep_time)
 
-def capitalise(self):
-    return self[0].upper() + self[1:]
+def capitalise(text):
+    return text[0].upper() + text[1:]
 
 # Example usage and test code
 if __name__ == "__main__":

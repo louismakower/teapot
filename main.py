@@ -4,38 +4,63 @@ import subprocess
 from fastapi import FastAPI
 from datetime import datetime, UTC
 from pathlib import Path
-from dotenv import load_dotenv
 import threading
 import paho.mqtt.publish as publish
+from pydantic import BaseModel
+from typing import List, Literal
 
 lock = threading.Lock()
 
 # mqtt setup
 MQTT_BROKER = "192.168.101.197"
-MQTT_PORT = "1883"
-MQTT_TOPIC = "teacounter/messages"
+MQTT_TOPIC = "teacounter"
 
+app = FastAPI(title="Tea counter")
     
-def publish_message(message: str, event_type: str, count: int):
+def broadcast_message(type: str, message: str):
+    try:
+        payload = {
+            "type": type,
+            "message": message,
+            "timestamp": datetime.now(UTC).isoformat()
+        }
+        topic = f"{MQTT_TOPIC}/all"
+        publish.single(topic, payload=json.dumps(payload), hostname=MQTT_BROKER)
+        print(f"Broadcast {message}")
+    except Exception as e:
+        print(f"MQTT broadcast failed: {e}")
+
+def broadcast_celebration(message: str):
+    try:
+        payload = {
+            "type": "celebration",
+            "message": message,
+            "timestamp": datetime.now(UTC).isoformat(),
+        }
+        topic = f"{MQTT_TOPIC}/all"
+        publish.single(topic, payload=json.dumps(payload), hostname=MQTT_BROKER)
+        print(f"Celebration sent: {message}")
+    except Exception as e:
+        print(f"MQTT celebration broadcast failed: {e}")
+
+def send_message_to_screen(message: str, targets: list[str]):
+    """
+    Targets is either a list of users
+    """
     try:
         payload = {
             "type": "message",
-            "subtype": event_type,
             "message": message,
-            "count": count,
             "timestamp": datetime.now(UTC).isoformat()
         }
-        publish.single(MQTT_TOPIC, payload=json.dumps(payload), hostname=MQTT_BROKER)
-        print(f"Published {message}")
+        # Send to specific people
+        for screen_id in targets:
+            topic = f"{MQTT_TOPIC}/{screen_id}"
+            publish.single(topic, payload=json.dumps(payload), hostname=MQTT_BROKER)
+            print(f"Published to {screen_id}: {message}")
+
     except Exception as e:
         print(f"MQTT publish failed: {e}")
-    
-load_dotenv()
-app = FastAPI(title="Tea counter")
-
-@app.get("/")
-def home():
-    return {"message": "this is the tea/coffee counter"}
 
 def init_user(username: str):
     user_dir = Path(f"./data/{username}")
@@ -132,7 +157,7 @@ def git_commit_and_push(username: str, drink_type: str):
                 return False
             
             # Create commit message
-            commit_message = f"{username} registered {drink_type} at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+            commit_message = f"{username} registered {drink_type} at {datetime.now(UTC).isoformat()}"
             
             # Commit changes
             result = subprocess.run(["git", "commit", "-m", commit_message], cwd=Path.cwd(), capture_output=True, text=True)
@@ -158,7 +183,6 @@ def register_coffee(username: str):
     init_user(username)
     increment_coffee(username)
     git_success = git_commit_and_push(username, "coffee")
-    publish_message("hello world", "celebration", "3")
 
     return {
         "user": username,
@@ -166,9 +190,22 @@ def register_coffee(username: str):
         "git_push": "success"  if git_success else "failed"
     }
 
-@app.post("/send_message/{message}")
-def send_message(message: str):
-    publish_message(message=message, event_type="celebration", count=3)
+class MessageRequest(BaseModel):
+    users: List[str] | Literal["all"] # can be "all" or a list of usernames
+    message: str
+
+@app.post("/send_message")
+def send_message(req: MessageRequest):
+    if req.users == "all":
+        broadcast_message(
+            type="message",
+            message=req.message,
+        )
+    else:
+        send_message_to_screen(
+            message=req.message,
+            targets=req.users,
+        )
 
 @app.post("/{username}/tea")
 def register_tea(username: str):
@@ -183,36 +220,42 @@ def register_tea(username: str):
     }
 
 @app.get("/stats/{username}")
-def get_user_stats(username: str):
+def get_stats(username: str):
     user_dir = Path(f"data/{username}")
+
+    all_stats = get_all_stats(username)
 
     if not user_dir.exists():
         return {
             "user": username,
-            "tea": 0,
-            "coffee": 0,
+            "user_tea": 0,
+            "user_coffee": 0,
+            "all_tea": all_stats["all_tea"],
+            "all_coffee": all_stats["all_coffee"],
         }
     
-    tea_count = count_lines_in_file(user_dir / "tea.txt")
-    coffee_count = count_lines_in_file(user_dir / "coffee.txt")
+    return all_stats
 
-    return {
-        "user": username,
-        "tea": tea_count,
-        "coffee": coffee_count,
-    }
+def get_user_stats(username: str):
+    tea_count = count_lines_in_file(Path(f"data/{username}/tea.txt"))
+    coffee_count = count_lines_in_file(Path(f"data/{username}/coffee.txt"))
+    return {"tea": tea_count, "coffee": coffee_count}
 
-@app.get("/stats_all")
-def get_all_stats():
+def get_all_stats(curr_user):
     all_data = {
-        "tea": 0,
-        "coffee": 0
+        "user": curr_user,
+        "all_tea": 0,
+        "all_coffee": 0
     }
 
     for user in os.listdir("data"):
         user_data = get_user_stats(user)
-        all_data["coffee"] += user_data["coffee"]
-        all_data["tea"] += user_data["tea"]
+        all_data["all_coffee"] += user_data["coffee"]
+        all_data["all_tea"] += user_data["tea"]
+
+        if user == curr_user:
+            all_data["user_coffee"] = user_data["coffee"]
+            all_data["user_tea"] = user_data["tea"]
     
     return all_data
 

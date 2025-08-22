@@ -9,7 +9,11 @@ from setup import USER_NAME, SERVER_IP, PORT, MQTT_BROKER, MQTT_TOPIC
 
 API_URL = f"http://{SERVER_IP}:{PORT}"
 message_queue = []
+celebration_queue = []
 mqtt_client = None
+DEBOUNCE_TIME = 50 # ms
+LONG_PRESS = 1000 # ms
+DOUBLE_CLICK_WINDOW = 500 # ms
 
 def setup_mqtt():
     """Setup MQTT client and subscribe"""
@@ -19,7 +23,8 @@ def setup_mqtt():
         mqtt_client = MQTTClient(client_id, MQTT_BROKER)
         mqtt_client.set_callback(mqtt_callback)
         mqtt_client.connect()
-        mqtt_client.subscribe(MQTT_TOPIC)
+        mqtt_client.subscribe(f"{MQTT_TOPIC}/all")
+        mqtt_client.subscribe(f"{MQTT_TOPIC}/{USER_NAME}")
         print("MQTT connected and subscribed")
         return True
     except Exception as e:
@@ -28,12 +33,13 @@ def setup_mqtt():
 
 def mqtt_callback(topic, msg):
     """Handle incoming MQTT messages"""
-    global message_queue
     try:
         data = json.loads(msg.decode())
-        print(data)
         if data.get("type") == "message":
             message_queue.append(data["message"])
+            print(f"Received message: {data['message']}")
+        elif data.get("type") == "celebration":
+            celebration_queue.append(data["message"])
             print(f"Received celebration: {data['message']}")
     except Exception as e:
         print(f"MQTT callback error: {e}")
@@ -48,12 +54,12 @@ def setup_screen():
         reset=Pin(6, Pin.OUT),
         backlight=Pin(0, Pin.OUT)
     )
-    screen.error_message("Loading...")
+    screen.message("Loading...")
 
 def setup_switch():
-    global switch_pressed, debounce_time, last_interrupt_time
+    global switch_pressed, last_interrupt_time, switch_pin
     switch_pressed = False
-    debounce_time = 50 # ms
+    
     last_interrupt_time = 0
 
     # Setup button
@@ -67,7 +73,7 @@ def switch_handler(pin):
     current_time = time.ticks_ms()
     
     # Check if enough time has passed since last interrupt
-    if time.ticks_diff(current_time, last_interrupt_time) > debounce_time:
+    if time.ticks_diff(current_time, last_interrupt_time) > DEBOUNCE_TIME:
         # Only trigger if pin is actually LOW (pressed)
         if pin.value() == 0:
             switch_pressed = True
@@ -96,7 +102,7 @@ def setup_ethernet():
         return False
     except Exception as e:
         print(e)
-        screen.error_message(str(e))
+        screen.message(str(e))
         return False
 
 def send_click(drink_type: str):
@@ -115,7 +121,7 @@ def send_click(drink_type: str):
         
     except Exception as e:
         print(f"Error: {e}")
-        screen.error_message(f"Error: {str(e)}")
+        screen.message(f"Error: {str(e)}")
         return False
 
 def send_undo():
@@ -133,12 +139,12 @@ def send_undo():
             return True
         else:
             print(f"failed: {result['message']}")
-            screen.error_message(f"Failed: {result['message']}")
+            screen.message(f"Failed: {result['message']}")
             return False
         
     except Exception as e:
         print(f"Error: {e}")
-        screen.error_message(f"Error: {str(e)}")
+        screen.message(f"Error: {str(e)}")
         return False
 
 def get_user_data():
@@ -147,27 +153,18 @@ def get_user_data():
         response = urequests.get(url)
         result = response.json()
         return True, {
-            "tea": result["tea"],
-            "coffee": result["coffee"]
+            "tea": result["user_tea"],
+            "coffee": result["user_coffee"]
         }
     except Exception as e:
         print(f"error: {e}")
         return False, {}
-    
-def get_all_data():
-    try:
-        url = f"{API_URL}/stats_all"
-        response = urequests.get(url)
-        result = response.json()
-        return True, result
-    except Exception as e:
-        print(f"error: {e}")
-        return False, {}
+
 
 def update_home_screen():
     user_success, user_data = get_user_data()
     if user_success:
-        screen.home_screen(USER_NAME, user_data["tea"], user_data["coffee"])
+        screen.home_screen(USER_NAME, user_data["user_tea"], user_data["user_coffee"])
 
 
 if __name__ == "__main__":
@@ -178,13 +175,13 @@ if __name__ == "__main__":
 
     # Connect to api
     while not setup_ethernet():
-        screen.error_message("Cannot start without internet")
+        screen.message("Cannot start without internet")
         while True:
             time.sleep(1)
 
     # connect to MQTT
     if not setup_mqtt():
-        screen.error_message("MQTT setup failed")
+        screen.message("MQTT setup failed")
         while True:
             time.sleep(1)
 
@@ -200,9 +197,9 @@ if __name__ == "__main__":
             print(f"MQTT error: {e}")
         print(f"messages: {message_queue}")
         if message_queue:
-            screen.celebrate([
-                message_queue.pop(0),
-            ])
+            screen.message(message_queue.pop(0))
+        if celebration_queue:
+            screen.celebrate(celebration_queue.pop(0))
 
         if switch_pressed:
             switch_pressed = False
@@ -210,7 +207,7 @@ if __name__ == "__main__":
             
             # Wait for button release or timeout for long press detection
             while switch_pin.value() == 0:  # Button still pressed
-                if time.ticks_diff(time.ticks_ms(), press_start_time) >= 1000:
+                if time.ticks_diff(time.ticks_ms(), press_start_time) >= LONG_PRESS:
                     # Long press detected (1 second)
                     if send_undo():
                         screen.draw_undo()
@@ -234,7 +231,7 @@ if __name__ == "__main__":
                 # Button was released - check for double click
                 double_count_timer = time.ticks_ms()
                 double_click = False
-                while time.ticks_ms() < double_count_timer + 500:
+                while time.ticks_ms() < double_count_timer + DOUBLE_CLICK_WINDOW:
                     if switch_pressed:
                         double_click = True
                         switch_pressed = False
