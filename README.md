@@ -36,25 +36,11 @@ Hardware: [WIZnet W5500-EVB-Pico](https://thepihut.com/products/wiznet-w5100s-ev
 1. Install the raspbery pi pico extension in VSCode.  Follow this [guide](https://www.hackster.io/Shilleh/how-to-use-vscode-with-raspberry-pi-pico-w-and-micropython-de88d6
 ) if necessary.
 2. Connect to the Pico by pressing `Ctrl + Shift + P`, and executing **MicroPico: Connect**
-3. Copy the files inside `pico_stuff`(./pico_stuff) to a workspace.
-4. Change the **username** in `main.py` to your own name.
-5. Add the **IP** and **port** in `main.py` being used for the server.
+3. Change the **username** in `setup.py` to your own name.
+4. Add the **IP** and **port** in `setup.py` being used for the server.
+5. Copy the files inside `pico_stuff`(./pico_stuff) to the pico, by first running `Initialize MicroPico Projecet` and then running `Upload Projec to Pico`.  Both these commands can be accessed by pressing `Ctrl + Shift + P`.
 6. In the REPL, test `import urequests`.  If you get an error, then you need to install it manually.  See the note at the bottom.
-7. Save the [main script](pico_stuff/main.py) on the pico, making sure it is saved as `main.py.`  In VSCode, this is done by right-clicking the file and selecting **Upload File to Pico**.
-8. Also save the following scripts:
-
-   | Name |
-   |------------|
-   | [Display script](pico_stuff/display.py)        |
-   | [Driver script](pico_stuff/driver.py)        |
-   | [Coffee bitmap](pico_stuff/coffee_bitmap.py)        |
-   | [Tea bitmap](pico_stuff/tea_bitmap.py)        |
-   | [Undo bitmap](pico_stuff/undo_bitmap.py)         |
-   | [Small font](pico_stuff/vga2_8x8.py)         |
-   | [Big font](pico_stuff/vga2_16x16.py)        |
-
-
-9. If you want to create new icons, you can use the [`convert_images.py`](pico_stuff/original_images/convert_images.py) to do so.
+7. If you want to create new icons, you can use the [`convert_images.py`](pico_stuff/original_images/convert_images.py) to do so.
 
 ## MQTT instructions
 1. On the pi / API server device, install moquitto.  Then edit the config file found at `/etc/mosquitto/mosquitto.conf` by adding the lines:
